@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import copy
+import torchvision.models as models
+from collections import namedtuple
+
+
 
 from settings import *
 import utils
@@ -23,7 +27,6 @@ class ContentLoss(nn.Module):
 
 
 class StyleLoss(nn.Module):
-
     def __init__(self, target_feature):
         super(StyleLoss, self).__init__()
         self.target = utils.gram_matrix(target_feature).detach()
@@ -32,6 +35,7 @@ class StyleLoss(nn.Module):
         G = utils.gram_matrix(input)
         self.loss = F.mse_loss(G, self.target)
         return input
+
 
 class Normalization(nn.Module):
     def __init__(self, mean, std):
@@ -44,7 +48,49 @@ class Normalization(nn.Module):
 
     def forward(self, img):
         # normalize img
+        img = img.div_(255.0)
         return (img - self.mean) / self.std
+
+
+class VGG_loss_net(nn.Module):
+    def __init__(self):
+        super(VGG_loss_net, self).__init__()
+        vgg_pretrained = models.vgg16_bn(pretrained=True).features.to(DEVICE).eval()
+        self.slice1 = torch.nn.Sequential()
+        self.slice2 = torch.nn.Sequential()
+        self.slice3 = torch.nn.Sequential()
+        self.slice4 = torch.nn.Sequential()
+        for x in range(4):
+            self.slice1.add_module(str(x), vgg_pretrained[x])
+        for x in range(4, 9):
+            self.slice2.add_module(str(x), vgg_pretrained[x])
+        for x in range(9, 16):
+            self.slice3.add_module(str(x), vgg_pretrained[x])
+        for x in range(16, 23):
+            self.slice4.add_module(str(x), vgg_pretrained[x])
+
+        vgg_normalization_mean = torch.tensor([0.485, 0.456, 0.406]).to(DEVICE)
+        vgg_normalization_std = torch.tensor([0.229, 0.224, 0.225]).to(DEVICE)
+        self.normalize = Normalization(vgg_normalization_mean, vgg_normalization_std)
+
+
+    def forward(self, X):
+        h = self.normalize(X)
+        h = self.slice1(h)
+        h_relu1_2 = h
+        h = self.slice2(h)
+        h_relu2_2 = h
+        h = self.slice3(h)
+        h_relu3_3 = h
+        h = self.slice4(h)
+        h_relu4_3 = h
+        vgg_outputs = namedtuple("VggOutputs", ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
+        out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3)
+        return out
+
+
+
+
 
 def get_style_model_and_losses(cnn,
                                style_img, content_img,

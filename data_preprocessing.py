@@ -2,7 +2,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import glob
 import torchvision.transforms as transforms
+import numpy as np
 from settings import *
+import torch
 
 
 # Data loader
@@ -26,21 +28,17 @@ def image_loader(image_name):
     loader = transforms.Compose([
             transforms.Resize(IMSIZE),
             transforms.RandomCrop(IMSIZE),
-            transforms.ToTensor()])
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.mul(255.0))
+    ])
 
-    image = Image.open(image_name)
-
+    image = Image.open(image_name).convert('RGB')
     image = loader(image)
-    
-    return image.to(DEVICE, torch.float)
+    return image
 
-
-def imshow(tensor, title=None):
-    unloader = transforms.ToPILImage()  # reconvert into PIL image
-    image = tensor.cpu().clone()  # we clone the tensor to not do changes on it
-    image = image.squeeze(0)      # remove the fake batch dimension
-    image = unloader(image)
-    plt.imshow(image)
-    if title is not None:
-        plt.title(title)
-    plt.show()
+def imshow(data, title=None, filename='test.jpg'):
+    img = data.cpu().clone().clamp(0, 255).numpy()
+    img = img.squeeze(0)      # remove the fake batch dimension
+    img = img.transpose(1, 2, 0).astype("uint8")
+    img = Image.fromarray(img)
+    img.save(filename)

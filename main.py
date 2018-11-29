@@ -1,87 +1,117 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from settings import *
 import torch.optim as optim
-
-from PIL import Image
-import matplotlib.pyplot as plt
-
-import torchvision.transforms as transforms
-import torchvision.models as models
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+import torch.nn.functional as F
 import image_transform_net as img_net
 import vgg_net
 import data_preprocessing as dp
-from settings import *
+import utils
 import multiprocessing
+import os
+import argparse
 
-style_img = dp.image_loader("./images/styles/picasso.jpg").unsqueeze(0)
-# content_img = dp.image_loader("./images/content/dancing.jpg")
+style_img = dp.image_loader("./images/styles/{}.jpg".format(STYLE)).unsqueeze(0)
 
-# plt.figure()
-# dp.imshow(style_img, title='Style Image')
 
-# plt.figure()
-# dp.imshow(content_img, title='Content Image')
-# input_img = content_img.clone() #torch.randn(1,3,128,128)
-# print("input image shape", input_img.shape)
-
-def train():
+def train(name, content_weight=1e2, style_weight=1e10):
     data_train = dp.ImageFolderLoader(IMAGE_FOLDER)
 
     kwargs = {'num_workers': multiprocessing.cpu_count(),
               'pin_memory': True} if USE_CUDA else {}
-    train_loader = torch.utils.data.DataLoader(data_train, batch_size=BATCH_SIZE, shuffle=True, **kwargs)
+    train_loader = torch.utils.data.DataLoader(data_train, batch_size=HYPERPARAMETERS['batch_size'], shuffle=True, **kwargs)
 
-    vgg_pretrained = models.vgg16_bn(pretrained=True).features.to(device).eval()
+    vgg_loss_net = vgg_net.VGG_loss_net()
+    image_transform_net = img_net.ImageTransformation().to(DEVICE)
+    optimizer = optim.Adam(image_transform_net.parameters(), lr=HYPERPARAMETERS['learning_rate'])
 
-    image_transform_net = img_net.ImageTransformation()
-    optimizer = optim.Adam(image_transform_net.parameters())
+    style_batch = style_img.repeat(HYPERPARAMETERS['batch_size'], 1, 1, 1).to(DEVICE)
+    style_features = vgg_loss_net(style_batch)
+    gram_style = [utils.gram_matrix(y) for y in style_features]
 
-    for _ in range(EPOCHS):
-        for batch_idx, input_img in enumerate(train_loader):
-            input_img = input_img.to(DEVICE)
-            print(input_img.shape)
+    style_path = os.path.join(STYLE, name)
+    checkpoint_path = utils.make_checkpoint_dir(style_path)
+    prediction_path = utils.make_checkpoint_dir(os.path.join(style_path, "predictions"))
+
+    total_loss_log = []
+    style_loss_log = []
+    content_loss_log = []
+    index_log = []
+    log = {'total_loss_log':total_loss_log, 'style_loss_log':style_loss_log, 'content_loss_log':content_loss_log, 'index_log':index_log}
+    log_filename = os.path.join(checkpoint_path, "log.pkl")
+
+    for e in range(HYPERPARAMETERS['epochs']):
+        image_transform_net.train()
+        print("Epochs {}".format(e))
+        for batch_idx, content_batch in enumerate(train_loader):
             optimizer.zero_grad()
-            y_hat = image_transform_net(input_img)
+            content_batch = content_batch.to(DEVICE)
+            y_hat_batch = image_transform_net(content_batch)
 
-            loss = loss_net(vgg_pretrained, input_img, style_img, y_hat)
-            print("Itr: {} Loss: {}".format(batch_idx, loss.item()))
-            loss.backward()
+            total_loss, style_loss, content_loss = loss_evaluation(vgg_loss_net, content_batch, y_hat_batch, gram_style,
+                                                                   content_weight=content_weight, style_weight=style_weight)
+            total_loss.backward(retain_graph=True)
+            if (batch_idx + 1) % ITERS == 0:
+                print("Itr {} Total loss {} ".format(batch_idx + 1, total_loss.item() / HYPERPARAMETERS['batch_size']))
+                print("\t Style loss: {} Content loss: {}".format(style_loss.item(), content_loss.item()))
+                eval(image_transform_net, filename=os.path.join(prediction_path, "test_{}_{}.jpg".format(e, batch_idx + 1)))
+
+                # COMET ML
+                step = e * len(train_loader) + batch_idx
+                LOGGER.log_metric("total_loss", total_loss.item(), step=step)
+                LOGGER.log_metric("style_loss", style_loss.item(), step=step)
+                LOGGER.log_metric("content_loss", content_loss.item(), step=step)
+
+                log['total_loss_log'].append(total_loss.item())
+                log['style_loss_log'].append(style_loss.item())
+                log['content_loss_log'].append(content_loss.item())
+                log['index_log'].append(e * len(train_loader) + batch_idx)
+                utils.write_log(log, log_filename)
             optimizer.step()
+        torch.save(image_transform_net, os.path.join(checkpoint_path, "{}.model".format(e)))
+        LOGGER.log_epoch_end(e)
 
+    eval(image_transform_net, filename=os.path.join(prediction_path, "test_final.jpg"))
+    utils.plot_log(log_filename)
     return image_transform_net
 
-def eval(model):
-    content_img = dp.image_loader("./images/content/dancing.jpg").unsqueeze(0)
 
-    output = model(content_img)
-    output = torch.sigmoid(output)
+def eval(model, content_img=None, filename='test'):
+    with torch.no_grad():
+        if content_img is None:
+            content_img = dp.image_loader("./images/content/{}.jpg".format(EVAL_CONTENT_IMAGE)).unsqueeze(0).to(DEVICE)
 
-    plt.figure()
-    dp.imshow(output, title='Output Image')
+        output = model(content_img)
+        dp.imshow(output, filename=filename)
+        LOGGER.log_image(file_path=filename, file_name=os.path.basename(filename))
 
-    plt.show()
-    
-def loss_net(cnn, content_img, style_img, input_img, style_weight=1000000, content_weight=1):
-    # print('Building the style transfer model..')
-    loss_model, style_losses, content_losses = vgg_net.get_style_model_and_losses(cnn, style_img, content_img)
-    
-    loss_model(input_img)
-    style_score = 0
-    content_score = 0
 
-    for sl in style_losses:
-        style_score += sl.loss
-    for cl in content_losses:
-        content_score += cl.loss
+def loss_evaluation(vgg_loss_net, content_batch, y_hat_batch, gram_style, content_weight=1e2, style_weight=1e10):
+    batch_size = len(content_batch)
 
-    style_score *= style_weight
-    content_score *= content_weight
+    content_features = vgg_loss_net(content_batch)
+    y_hat_features = vgg_loss_net(y_hat_batch)
 
-    return style_score + content_score
+    content_loss = content_weight * F.mse_loss(content_features.relu2_2, y_hat_features.relu2_2)
 
-model = train()
+    style_loss = 0.0
+    for y_hat_ft, gm_style in zip(y_hat_features, gram_style):
+        gm_y_hat = utils.gram_matrix(y_hat_ft)
+        style_loss += F.mse_loss(gm_style[:batch_size, :, :], gm_y_hat)
+
+    style_loss *= style_weight
+    total_loss = content_loss + style_loss
+    return total_loss, style_loss, content_loss
+
+main_arg_parser = argparse.ArgumentParser()
+main_arg_parser.add_argument("--name", type=str, required=True)
+main_arg_parser.add_argument("--content_weight", type=str, required=True)
+main_arg_parser.add_argument("--style_weight", type=str, required=True)
+args = main_arg_parser.parse_args()
+content_weight = float(args.content_weight)
+style_weight = float(args.style_weight)
+
+HYPERPARAMETERS["content_weight"] = content_weight
+HYPERPARAMETERS["style_weight"] = style_weight
+LOGGER.log_multiple_params(HYPERPARAMETERS)
+
+model = train(args.name, content_weight=content_weight, style_weight=style_weight)
 eval(model)
