@@ -55,7 +55,7 @@ class Normalization(nn.Module):
 class VGG_loss_net(nn.Module):
     def __init__(self):
         super(VGG_loss_net, self).__init__()
-        vgg_pretrained = models.vgg16_bn(pretrained=True).features.to(DEVICE).eval()
+        vgg_pretrained = models.vgg16(pretrained=True).features.to(DEVICE).eval()
         self.slice1 = torch.nn.Sequential()
         self.slice2 = torch.nn.Sequential()
         self.slice3 = torch.nn.Sequential()

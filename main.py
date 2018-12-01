@@ -10,6 +10,8 @@ import os
 import argparse
 
 style_img = dp.image_loader("./images/styles/{}.jpg".format(STYLE)).unsqueeze(0)
+LOGGER.log_image(file_path="./images/styles/{}.jpg".format(STYLE), file_name=STYLE)
+LOGGER.log_image(file_path="./images/content/{}.jpg".format(EVAL_CONTENT_IMAGE), file_name=EVAL_CONTENT_IMAGE)
 
 
 def train(name, content_weight=1e2, style_weight=1e10):
@@ -90,12 +92,12 @@ def loss_evaluation(vgg_loss_net, content_batch, y_hat_batch, gram_style, conten
     content_features = vgg_loss_net(content_batch)
     y_hat_features = vgg_loss_net(y_hat_batch)
 
-    content_loss = content_weight * F.mse_loss(content_features.relu2_2, y_hat_features.relu2_2)
+    content_loss = content_weight * F.mse_loss(y_hat_features.relu2_2, content_features.relu2_2)
 
     style_loss = 0.0
     for y_hat_ft, gm_style in zip(y_hat_features, gram_style):
         gm_y_hat = utils.gram_matrix(y_hat_ft)
-        style_loss += F.mse_loss(gm_style[:batch_size, :, :], gm_y_hat)
+        style_loss += F.mse_loss(gm_y_hat, gm_style[:batch_size, :, :])
 
     style_loss *= style_weight
     total_loss = content_loss + style_loss

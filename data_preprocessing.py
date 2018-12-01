@@ -36,9 +36,11 @@ def image_loader(image_name):
     image = loader(image)
     return image
 
-def imshow(data, title=None, filename='test.jpg'):
+def imshow(data, title=None, filename='test.jpg', save=True):
     img = data.cpu().clone().clamp(0, 255).numpy()
     img = img.squeeze(0)      # remove the fake batch dimension
     img = img.transpose(1, 2, 0).astype("uint8")
     img = Image.fromarray(img)
-    img.save(filename)
+    if save:
+        img.save(filename)
+    return img

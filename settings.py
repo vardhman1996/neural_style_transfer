@@ -1,7 +1,10 @@
 from comet_ml import Experiment
 import torch
 
-LOGGER = Experiment(api_key="f8rDRoriwkKaL9xSpv7HrpcMT",
+USE_LOGGER = False
+
+if USE_LOGGER:
+    LOGGER = Experiment(api_key="f8rDRoriwkKaL9xSpv7HrpcMT",
                         project_name="fast_neural_style_transfer", workspace="vardhman1996")
 
 USE_CUDA = torch.cuda.is_available()
@@ -9,7 +12,7 @@ USE_CUDA = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMSIZE = 256 if torch.cuda.is_available() else 256  # use small size if no gpu
 
-STYLE = 'mosaic'
+STYLE = 'rain-princess'
 EVAL_CONTENT_IMAGE = 'amber'
 
 IMAGE_FOLDER = 'images/val2014'
@@ -28,3 +31,5 @@ HYPERPARAMETERS = {
 }
 
 CHECKPOINT_PATH = 'checkpoints/'
+VIDEO_INPUT = 'videos/input'
+VIDEO_OUT = 'videos/output'

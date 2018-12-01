@@ -10,6 +10,10 @@ def gram_matrix(y):
     gram = features.bmm(features_t) / (ch * h * w)
     return gram
 
+def makedir(dir_path):
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
+
 def make_checkpoint_dir(name):
     dir_path = os.path.join(CHECKPOINT_PATH, name)
     if not os.path.isdir(dir_path):
