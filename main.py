@@ -53,7 +53,7 @@ def train(name, content_weight=1e2, style_weight=1e10):
             total_loss.backward(retain_graph=True)
             if (batch_idx + 1) % ITERS == 0:
                 print("Itr {} Total loss {} ".format(batch_idx + 1, total_loss.item() / HYPERPARAMETERS['batch_size']))
-                print("\t Style loss: {} Content loss: {}".format(style_loss.item(), content_loss.item()))
+                # print("\t Style loss: {} Content loss: {}".format(style_loss.item(), content_loss.item()))
                 eval(image_transform_net, filename=os.path.join(prediction_path, "test_{}_{}.jpg".format(e, batch_idx + 1)))
 
                 # COMET ML
@@ -69,9 +69,9 @@ def train(name, content_weight=1e2, style_weight=1e10):
                 utils.write_log(log, log_filename)
             optimizer.step()
         torch.save(image_transform_net, os.path.join(checkpoint_path, "{}.model".format(e)))
+        eval(image_transform_net, filename=os.path.join(prediction_path, "test_epoch_model_{}.jpg".format(e)))
         LOGGER.log_epoch_end(e)
 
-    eval(image_transform_net, filename=os.path.join(prediction_path, "test_final.jpg"))
     utils.plot_log(log_filename)
     return image_transform_net
 
@@ -103,6 +103,7 @@ def loss_evaluation(vgg_loss_net, content_batch, y_hat_batch, gram_style, conten
     total_loss = content_loss + style_loss
     return total_loss, style_loss, content_loss
 
+
 main_arg_parser = argparse.ArgumentParser()
 main_arg_parser.add_argument("--name", type=str, required=True)
 main_arg_parser.add_argument("--content_weight", type=str, required=True)
@@ -116,4 +117,3 @@ HYPERPARAMETERS["style_weight"] = style_weight
 LOGGER.log_multiple_params(HYPERPARAMETERS)
 
 model = train(args.name, content_weight=content_weight, style_weight=style_weight)
-eval(model)

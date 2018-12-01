@@ -12,7 +12,7 @@ USE_CUDA = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMSIZE = 256 if torch.cuda.is_available() else 256  # use small size if no gpu
 
-STYLE = 'rain-princess'
+STYLE = 'starry_night'
 EVAL_CONTENT_IMAGE = 'amber'
 
 IMAGE_FOLDER = 'images/val2014'

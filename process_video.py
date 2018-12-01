@@ -69,12 +69,12 @@ def eval_model_live(model_path):
     cv2.destroyAllWindows()
 
 
-def eval_model_offline(model_path, video_file, output_file_dir):
+def eval_model_offline(model_path, video_file, output_file_dir, model_number):
     model = load_model(model_path)
     loader = get_loader()
 
     video_path = os.path.join(VIDEO_INPUT, video_file)
-    video_out = os.path.join(output_file_dir, "output.avi")
+    video_out = os.path.join(output_file_dir, "output-{}.avi".format(model_number))
 
     cap = cv2.VideoCapture(video_path)
     input_fps = cap.get(cv2.CAP_PROP_FPS)
@@ -116,6 +116,6 @@ model_path = os.path.join(checkpoint_path, "{}.model".format(args.model_no))
 if args.video_file:
     output_file_dir = os.path.join(VIDEO_OUT, args.style)
     makedir(output_file_dir)
-    eval_model_offline(model_path, args.video_file, output_file_dir)
+    eval_model_offline(model_path, args.video_file, output_file_dir, args.model_no)
 else:
     eval_model_live(model_path)
