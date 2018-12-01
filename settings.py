@@ -1,7 +1,7 @@
 from comet_ml import Experiment
 import torch
 
-USE_LOGGER = False
+USE_LOGGER = True
 
 if USE_LOGGER:
     LOGGER = Experiment(api_key="f8rDRoriwkKaL9xSpv7HrpcMT",

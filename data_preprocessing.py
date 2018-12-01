@@ -13,7 +13,7 @@ class ImageFolderLoader(torch.utils.data.Dataset):
 
         self.transform = transform
         self.data_paths = []
-        for img_path in glob.glob(folder + "/*.jpg"):
+        for img_path in glob.glob(folder + "/*.jpg")[:20000]:
             self.data_paths += [img_path]
 
     def __len__(self):
