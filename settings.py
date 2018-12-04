@@ -10,13 +10,13 @@ if USE_LOGGER:
 USE_CUDA = torch.cuda.is_available()
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-IMSIZE = 256 if torch.cuda.is_available() else 256  # use small size if no gpu
+IMSIZE = 420 if torch.cuda.is_available() else 256  # use small size if no gpu
 
-STYLE = 'starry_night'
+STYLE = 'mosaic'
 EVAL_CONTENT_IMAGE = 'amber'
 
 IMAGE_FOLDER = 'images/val2014'
-ITERS = 200
+ITERS = 1000
 
 CONTENT_LAYERS_DEFAULT = ['relu_7']
 STYLE_LAYERS_DEFAULT = ['relu_2', 'relu_4', 'relu_7', 'relu_10']
@@ -24,7 +24,7 @@ STYLE_LAYERS_DEFAULT = ['relu_2', 'relu_4', 'relu_7', 'relu_10']
 # train params
 HYPERPARAMETERS = {
     "learning_rate": 0.001,
-    "batch_size": 8,
+    "batch_size": 1 if IMSIZE == 420 else 8,
     "epochs": 3,
     "style": STYLE,
     "content": EVAL_CONTENT_IMAGE

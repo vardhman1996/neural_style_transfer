@@ -24,6 +24,7 @@ def train(name, content_weight=1e2, style_weight=1e10):
     vgg_loss_net = vgg_net.VGG_loss_net()
     image_transform_net = img_net.ImageTransformation().to(DEVICE)
     optimizer = optim.Adam(image_transform_net.parameters(), lr=HYPERPARAMETERS['learning_rate'])
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
 
     style_batch = style_img.repeat(HYPERPARAMETERS['batch_size'], 1, 1, 1).to(DEVICE)
     style_features = vgg_loss_net(style_batch)
@@ -70,6 +71,7 @@ def train(name, content_weight=1e2, style_weight=1e10):
             optimizer.step()
         torch.save(image_transform_net, os.path.join(checkpoint_path, "{}.model".format(e)))
         eval(image_transform_net, filename=os.path.join(prediction_path, "test_epoch_model_{}.jpg".format(e)))
+        scheduler.step()
         LOGGER.log_epoch_end(e)
 
     utils.plot_log(log_filename)
