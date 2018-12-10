@@ -5,6 +5,7 @@ import os
 import argparse
 from torchvision import transforms
 from utils import makedir
+from PIL import Image
 
 
 def load_model(filename):
@@ -17,7 +18,6 @@ def load_model(filename):
 def get_loader():
     loader = transforms.Compose([
                 transforms.ToPILImage(),
-                transforms.Resize(IMSIZE),
                 transforms.ToTensor(),
                 transforms.Lambda(lambda x: x.mul(255.0))
             ])
@@ -32,10 +32,7 @@ def unload_image(frame):
     img = img[:, :, permute]
     return img
 
-
 def process_frame(frame, model, loader):
-    frame = cv2.resize(frame, (IMSIZE, IMSIZE))
-
     frame = loader(frame)
     frame = frame.unsqueeze(0)
 
@@ -48,16 +45,23 @@ def process_frame(frame, model, loader):
 
 def eval_model_live(model_path):
     model = load_model(model_path)
-    loader = get_loader()
+    loader = transforms.Compose([
+            transforms.Resize(128),
+            transforms.RandomCrop(128),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x.mul(255.0))
+    ])
 
     cap = cv2.VideoCapture(0)
 
     while (True):
         # Capture frame-by-frame
         ret, frame = cap.read()
-
+        frame = cv2.resize(frame, (128, 128))
+        # print("before", frame.shape)
+        frame = Image.fromarray(frame)
         frame = process_frame(frame, model, loader)
-
+        # print("after", frame.shape)
         # Display the resulting frame
         cv2.imshow('frame', frame)
 
@@ -74,13 +78,15 @@ def eval_model_offline(model_path, video_file, output_file_dir, model_number):
     loader = get_loader()
 
     video_path = os.path.join(VIDEO_INPUT, video_file)
-    video_out = os.path.join(output_file_dir, "output-{}.avi".format(model_number))
+    video_out = os.path.join(output_file_dir, "output_large_{}.avi".format(model_number))
 
     cap = cv2.VideoCapture(video_path)
     input_fps = cap.get(cv2.CAP_PROP_FPS)
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(video_out, fourcc, input_fps, (IMSIZE, IMSIZE))
+    width = int(cap.get(3)) 
+    height = int(cap.get(4)) 
+    out = cv2.VideoWriter(video_out, fourcc, input_fps, (width, height))
 
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print("Number of frames: ", num_frames)
@@ -90,7 +96,9 @@ def eval_model_offline(model_path, video_file, output_file_dir, model_number):
 
         if ret == True:
             i += 1
+            # print("before", frame.shape)
             frame = process_frame(frame, model, loader)
+            # print("after", frame.shape)
             out.write(frame)
 
             if (i + 1) % 10 == 0:

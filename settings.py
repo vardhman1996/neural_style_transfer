@@ -1,7 +1,10 @@
 from comet_ml import Experiment
+import time
+start = time.time()
 import torch
+print(time.time() - start)
 
-USE_LOGGER = True
+USE_LOGGER = False
 
 if USE_LOGGER:
     LOGGER = Experiment(api_key="f8rDRoriwkKaL9xSpv7HrpcMT",
@@ -33,3 +36,5 @@ HYPERPARAMETERS = {
 CHECKPOINT_PATH = 'checkpoints/'
 VIDEO_INPUT = 'videos/input'
 VIDEO_OUT = 'videos/output'
+IMAGE_OUT = 'images/eval'
+IMAGE_INPUT = 'images/content'
